@@ -1,0 +1,5 @@
+Flask==3.1.0
+groclake==0.2.3
+flask-cors==5.0.0
+gunicorn==23.0.0
+python-dotenv==1.0.1
