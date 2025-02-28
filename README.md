@@ -1,4 +1,4 @@
-# Investor-SME Matchmaking Platform
+# Investrix
 
 ## Overview
 This is a Next.js web application that leverages AI to match investors with Small and Medium Enterprises (SMEs). The platform features a bidding system for payments built on top of the Aptos blockchain and uses Gemini AI for document verification.
