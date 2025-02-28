@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Investor-SME Matchmaking Platform
 
-## Getting Started
+## Overview
+This is a Next.js web application that leverages AI to match investors with Small and Medium Enterprises (SMEs). The platform features a bidding system for payments built on top of the Aptos blockchain and uses Gemini AI for document verification.
 
-First, run the development server:
+## Features
+- **AI-powered Matching**: Uses machine learning to connect investors with the most relevant SMEs based on their profiles and investment preferences.
+- **Aptos-based Bidding System**: Secure and transparent bidding for funding using the Aptos blockchain.
+- **Gemini AI for Document Verification**: Ensures the authenticity of SME documents to prevent fraud.
+- **Secure Authentication**: Integrated with NextAuth for user authentication.
+- **Scalable Architecture**: Built using Next.js for a fast and efficient frontend experience.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Tech Stack
+- **Frontend**: Next.js, React, TailwindCSS
+- **Backend**: Node.js, Express.js, GraphQL
+- **Database & Auth**: Firebase
+- **AI Services**: Gemini API for document verification and investor-SME matching
+- **Blockchain**: Aptos for payment bidding system
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Installation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Clone the repository:
+   ```sh
+   git clone https://github.com/adithyanotfound/investrix-final.git
+   cd investor-sme-platform
+   ```
+2. Install dependencies:
+   ```sh
+   npm install
+   ```
+3. Set up environment variables:
+   Create a `.env` file and add the necessary environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Start the development server:
+   ```sh
+   npm run dev
+   ```
 
-## Learn More
+## Usage
+1. **Register/Login**: Users can sign up as investors or SMEs using NextAuth.
+2. **Create Profiles**: Investors and SMEs set up their profiles with relevant details.
+3. **AI Matching**: The system suggests ideal matches based on AI analysis.
+4. **Bidding System**: Investors place bids on SMEs they are interested in funding.
+5. **Document Verification**: SMEs upload documents, which are verified using Gemini AI.
+6. **Funding & Transactions**: Approved transactions are recorded on the Aptos blockchain.
 
-To learn more about Next.js, take a look at the following resources:
+## Contributing
+1. Fork the repository.
+2. Create a new branch (`feature-branch`).
+3. Commit your changes.
+4. Push to the branch and create a PR.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Contact
+For support, contact: `your-email@example.com`
