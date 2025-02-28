@@ -240,112 +240,76 @@ export default function InvestorDashboard() {
     }
   };
 
-  async function proceedToPayment(bid: FinalizedBid) {
-    try {
-      // Show loading toast
-      const loadingToast = toast.loading("Processing payment...");
+    const { account, signAndSubmitTransaction } = useWallet();
 
+
+    async function proceedToPayment(bid: FinalizedBid) {
+    try {
+      // Get the bid document
       const bidRef = doc(db, "bids", bid.id);
       const bidSnap = await getDoc(bidRef);
-      const appRef = doc(db, "applications", bidSnap.data()?.applicationId);
 
       if (!bidSnap.exists()) {
-        toast.dismiss(loadingToast);
         toast.error("Bid not found");
         return;
       }
 
-      // Add a delay of 3 seconds to simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Get required data
+      const bidData = bidSnap.data();
+      const amount = parseFloat(String(bidData.loanAmount || "0"));
 
-      await updateDoc(bidRef, {
-        status: 'finalized',
-        // transactionHash: pendingTransaction.hash
-      });
-      await updateDoc(appRef, {
-        fundingStatus: 'finalized'
-      });
+      // Ensure we have an account
+      if (!account) {
+        toast.error("Wallet not connected");
+        return;
+      }
 
-      // Dismiss loading toast and show success
-      toast.dismiss(loadingToast);
-      toast.success("Payment completed successfully!");
+      // Create the transaction
+      try {
+        const pendingTransaction = await signAndSubmitTransaction({
+          sender: account.address,
+          data: {
+            function: "0x1::aptos_account::transfer",
+            typeArguments: [],
+            functionArguments: [bidData.smeuserId, Math.floor(amount * 100000000)] // Convert to octas (10^8)
+          },
+        });
 
-      setIsModalOpen(true);
-    } catch (e) {
-      toast.error("An error occurred. Try Again.")
+        // Set transaction hash immediately
+        setTransactionHash(pendingTransaction.hash);
+
+        // Configure Aptos client
+        const config = new AptosConfig({ network: Network.TESTNET });
+        const aptos = new Aptos(config);
+
+        // Wait for transaction to complete
+        toast.loading("Processing transaction...");
+        const executedTransaction = await aptos.waitForTransaction({ transactionHash: pendingTransaction.hash });
+
+        // Update status in database
+        await updateDoc(bidRef, {
+          status: 'finalized',
+          // transactionHash: pendingTransaction.hash
+        });
+
+        // Show success
+        toast.dismiss();
+        toast.success("Payment successful!");
+        setIsModalOpen(true);
+
+        // Refresh data
+        if (userId) {
+          fetchFinalizedBids(userId);
+        }
+      } catch (error: any) {
+        console.error("Transaction error:", error);
+        toast.error(error.message || "Transaction failed");
+      }
+    } catch (error: any) {
+      console.error("Payment error:", error);
+      toast.error(error.message || "Failed to process payment");
     }
   }
-
-  //   const { account, signAndSubmitTransaction } = useWallet();
-
-
-  //   async function proceedToPayment(bid: FinalizedBid) {
-  //   try {
-  //     // Get the bid document
-  //     const bidRef = doc(db, "bids", bid.id);
-  //     const bidSnap = await getDoc(bidRef);
-
-  //     if (!bidSnap.exists()) {
-  //       toast.error("Bid not found");
-  //       return;
-  //     }
-
-  //     // Get required data
-  //     const bidData = bidSnap.data();
-  //     const amount = parseFloat(String(bidData.loanAmount || "0"));
-
-  //     // Ensure we have an account
-  //     if (!account) {
-  //       toast.error("Wallet not connected");
-  //       return;
-  //     }
-
-  //     // Create the transaction
-  //     try {
-  //       const pendingTransaction = await signAndSubmitTransaction({
-  //         sender: account.address,
-  //         data: {
-  //           function: "0x1::aptos_account::transfer",
-  //           typeArguments: [],
-  //           functionArguments: [bidData.smeuserId, Math.floor(amount * 100000000)] // Convert to octas (10^8)
-  //         },
-  //       });
-
-  //       // Set transaction hash immediately
-  //       setTransactionHash(pendingTransaction.hash);
-
-  //       // Configure Aptos client
-  //       const config = new AptosConfig({ network: Network.TESTNET });
-  //       const aptos = new Aptos(config);
-
-  //       // Wait for transaction to complete
-  //       toast.loading("Processing transaction...");
-  //       const executedTransaction = await aptos.waitForTransaction({ transactionHash: pendingTransaction.hash });
-
-  //       // Update status in database
-  //       await updateDoc(bidRef, {
-  //         status: 'finalized',
-  //         // transactionHash: pendingTransaction.hash
-  //       });
-
-  //       // Show success
-  //       toast.dismiss();
-  //       toast.success("Payment successful!");
-  //       setIsModalOpen(true);
-
-  //       // Refresh data
-  //       if (userId) {
-  //         fetchFinalizedBids(userId);
-  //       }
-  //     } catch (error: any) {
-  //       console.error("Transaction error:", error);
-  //       toast.error(error.message || "Transaction failed");
-  //     }
-  //   } catch (error: any) {
-  //     console.error("Payment error:", error);
-  //     toast.error(error.message || "Failed to process payment");
-  //   }
-  // }
 
   const safeParseFloat = (value: any): number => {
     if (value === undefined || value === null) return 0;
