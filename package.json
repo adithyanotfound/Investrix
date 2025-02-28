@@ -13,6 +13,7 @@
     "@aptos-labs/wallet-adapter-react": "^4.1.0",
     "@edgestore/react": "^0.3.2",
     "@edgestore/server": "^0.3.2",
+    "@google/generative-ai": "^0.22.0",
     "@radix-ui/react-slot": "^1.1.2",
     "@react-google-maps/api": "^2.20.6",
     "class-variance-authority": "^0.7.1",
@@ -27,7 +28,8 @@
     "react-hot-toast": "^2.5.2",
     "recharts": "^2.15.1",
     "tailwind-merge": "^3.0.1",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "tesseract.js": "^6.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
