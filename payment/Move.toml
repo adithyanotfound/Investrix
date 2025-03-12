@@ -1,0 +1,10 @@
+[package]
+name = "MyPaymentModule"
+version = "0.1.0"
+authors = ["Investrix"]
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework", rev = "main" }
+
+[addresses]
+my_addr = "0xd8db73ef23de00cfcbe074947ddd2c7e6f90e686cd4989af1b0da7d3a5ba7e3a"
