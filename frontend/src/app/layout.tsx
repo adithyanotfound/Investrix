@@ -3,8 +3,7 @@ import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ChatToggleButton } from "@/components/ChatToggleButton";
-import { Toaster } from "react-hot-toast";
-import { EdgeStoreProvider } from "@/lib/edgestore";
+import { ClientProviders } from "@/components/clientProviders";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -42,11 +41,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Suspense fallback={<div>Loading...</div>}>
-        <EdgeStoreProvider>
-          <Toaster position="bottom-right" />
-          {children}
-          <ChatToggleButton />
-        </EdgeStoreProvider>
+          <ClientProviders>
+            {children}
+            <ChatToggleButton />
+          </ClientProviders>
         </Suspense>
       </body>
     </html>

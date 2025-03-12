@@ -11,13 +11,12 @@ import { onAuthStateChanged } from "firebase/auth";
 import toast from 'react-hot-toast';
 import { fundStartup } from "@/lib/contracts";
 import {
-  Account,
-  Aptos,
-  AptosConfig,
   Network,
+  AptosConfig,
+  Aptos,
+  APTOS_COIN,
 } from "@aptos-labs/ts-sdk";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-
 
 // Types
 type LoanApplication = {
@@ -44,6 +43,7 @@ type FinalizedBid = {
   inrValue?: string;
   date?: string;
   fundingReceived?: number;
+  smeWalletAddress?: string; // Added for wallet transfer
 };
 
 interface ModalProps {
@@ -52,7 +52,7 @@ interface ModalProps {
   transactionHash: string | null;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, transactionHash }) => {
   if (!isOpen) return null;
 
   return (
@@ -70,14 +70,16 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose }) => {
         <div className="mb-6">
           <p className="mb-4">Thank you for using Innvestrix! Your payment is complete.</p>
 
-          <a
-            href={`https://explorer.aptoslabs.com/txn/0x22f5bc72d3208e409edd28f3a4ba3743ef6dcad2eac38ef49628e5a9e1b4e78d?network=testnet`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-500 hover:underline block mt-4"
-          >
-            View transaction on Aptos Labs
-          </a>
+          {transactionHash && (
+            <a
+              href={`https://explorer.aptoslabs.com/txn/${transactionHash}?network=testnet`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:underline block mt-4"
+            >
+              View transaction on Aptos Labs
+            </a>
+          )}
         </div>
         <div className="flex justify-end">
           <button
@@ -99,6 +101,10 @@ export default function InvestorDashboard() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Get wallet functions from Aptos wallet adapter
+  const { account, connected, connect, disconnect, wallets, signAndSubmitTransaction, network } = useWallet();
 
   useEffect(() => {
     onAuthStateChanged(auth, (user) => {
@@ -111,6 +117,16 @@ export default function InvestorDashboard() {
       }
     });
   }, [router]);
+
+  // Check wallet connection
+  useEffect(() => {
+    if (!connected && account === null) {
+      // Optional: You can auto-connect here or prompt user to connect
+      console.log("Wallet not connected");
+    } else if (connected && account) {
+      console.log("Connected wallet:", account.address);
+    }
+  }, [connected, account]);
 
   const fetchLoanApplications = async (userId: string) => {
     try {
@@ -146,15 +162,26 @@ export default function InvestorDashboard() {
         if ((data.status === 'finalized' || data.status === 'payment') && data.userId === userId) {
           // Get company name from application if needed
           let companyName = data.companyName || "";
+          let smeWalletAddress = data.smeWalletAddress || "";
+
           try {
-            if (!companyName && data.applicationId) {
+            if (data.applicationId) {
               const applicationDoc = await getDoc(doc(db, "applications", data.applicationId));
               if (applicationDoc.exists()) {
-                companyName = applicationDoc.data().companyName || "";
+                const appData = applicationDoc.data();
+                companyName = appData.companyName || "";
+
+                // Get SME wallet address from user profile if available
+                if (appData.userId) {
+                  const userDoc = await getDoc(doc(db, "users", appData.userId));
+                  if (userDoc.exists()) {
+                    smeWalletAddress = userDoc.data().walletAddress || "";
+                  }
+                }
               }
             }
           } catch (err) {
-            console.error("Error fetching company name:", err);
+            console.error("Error fetching company details:", err);
           }
 
           bids.push({
@@ -170,6 +197,7 @@ export default function InvestorDashboard() {
             userId: data.userId || "",
             fundingReceived: data.fundingReceived || 0,
             loanAmount: data.loanAmount || "0",
+            smeWalletAddress: smeWalletAddress,
           });
         }
       }
@@ -240,74 +268,91 @@ export default function InvestorDashboard() {
     }
   };
 
-    const { account, signAndSubmitTransaction } = useWallet();
-
-
-    async function proceedToPayment(bid: FinalizedBid) {
+  // Connect wallet function
+  const handleConnectWallet = async () => {
     try {
-      // Get the bid document
+      // If wallet is already connected, disconnect it
+      if (connected && account) {
+        await disconnect();
+        toast.success("Wallet disconnected");
+        return;
+      }
+
+      // If wallets are available, connect to the first one or show options
+      if (wallets && wallets.length > 0) {
+        // You might want to let the user choose which wallet to connect
+        // For simplicity, we'll connect to the first available wallet
+        await connect(wallets[0].name);
+        toast.success("Wallet connected successfully");
+      } else {
+        toast.error("No wallets found. Please install an Aptos wallet extension");
+      }
+    } catch (error: any) {
+      console.error("Wallet connection error:", error);
+      toast.error(error.message || "Failed to connect wallet");
+    }
+  };
+  // Disconnect wallet function
+  const handleDisconnectWallet = async () => {
+    try {
+      await disconnect();
+    } catch (error) {
+      console.error("Failed to disconnect wallet:", error);
+      toast.error("Failed to disconnect wallet");
+    }
+  };
+
+  // New implementation of proceedToPayment using Aptos wallet
+  async function proceedToPayment(bid: FinalizedBid) {
+    try {
+      // Show loading toast
+      const loadingToast = toast.loading("Processing payment...");
+
       const bidRef = doc(db, "bids", bid.id);
       const bidSnap = await getDoc(bidRef);
+      const appRef = doc(db, "applications", bidSnap.data()?.applicationId);
+      const receiverId = bidSnap.data()?.smeuserId;
+      const amount = safeParseFloat(bidSnap.data()?.loanAmount);
+
+      const config = new AptosConfig({ network: Network.TESTNET });
+      const aptos = new Aptos(config);
 
       if (!bidSnap.exists()) {
+        toast.dismiss(loadingToast);
         toast.error("Bid not found");
         return;
       }
 
-      // Get required data
-      const bidData = bidSnap.data();
-      const amount = parseFloat(String(bidData.loanAmount || "0"));
-
-      // Ensure we have an account
-      if (!account) {
-        toast.error("Wallet not connected");
-        return;
-      }
-
-      // Create the transaction
+      const response = await signAndSubmitTransaction({
+        data: {
+          function: "0x1::coin::transfer",
+          typeArguments: [APTOS_COIN],
+          functionArguments: [receiverId, amount * 100000000], // 1 is in Octas
+        },
+      });
+      // if you want to wait for transaction
       try {
-        const pendingTransaction = await signAndSubmitTransaction({
-          sender: account.address,
-          data: {
-            function: "0x1::aptos_account::transfer",
-            typeArguments: [],
-            functionArguments: [bidData.smeuserId, Math.floor(amount * 100000000)] // Convert to octas (10^8)
-          },
-        });
-
-        // Set transaction hash immediately
-        setTransactionHash(pendingTransaction.hash);
-
-        // Configure Aptos client
-        const config = new AptosConfig({ network: Network.TESTNET });
-        const aptos = new Aptos(config);
-
-        // Wait for transaction to complete
-        toast.loading("Processing transaction...");
-        const executedTransaction = await aptos.waitForTransaction({ transactionHash: pendingTransaction.hash });
-
-        // Update status in database
-        await updateDoc(bidRef, {
-          status: 'finalized',
-          // transactionHash: pendingTransaction.hash
-        });
-
-        // Show success
-        toast.dismiss();
-        toast.success("Payment successful!");
-        setIsModalOpen(true);
-
-        // Refresh data
-        if (userId) {
-          fetchFinalizedBids(userId);
-        }
-      } catch (error: any) {
-        console.error("Transaction error:", error);
-        toast.error(error.message || "Transaction failed");
+        await aptos.waitForTransaction({ transactionHash: response.hash });
+        setTransactionHash(String(response.hash));
+      } catch (error) {
+        console.error(error);
       }
-    } catch (error: any) {
-      console.error("Payment error:", error);
-      toast.error(error.message || "Failed to process payment");
+
+      await updateDoc(bidRef, {
+        status: 'finalized',
+        // transactionHash: pendingTransaction.hash
+      });
+      await updateDoc(appRef, {
+        fundingStatus: 'finalized'
+      });
+
+      // Dismiss loading toast and show success
+      toast.dismiss(loadingToast);
+      toast.success("Payment completed successfully!");
+
+      setIsModalOpen(true);
+    } catch (e) {
+      toast.error("An error occurred. Try Again.")
     }
   }
 
@@ -333,14 +378,38 @@ export default function InvestorDashboard() {
 
       <div className="p-6">
         <div className="flex justify-between items-center mb-8">
-          <Button
-            variant="outline"
-            className="border-white bg-black text-white hover:bg-white hover:text-black"
-            onClick={() => router.push('/dashboard/investor/MyBids')}
-          >
-            View My Bids
-          </Button>
+          <div>
+            <Button
+              variant="outline"
+              className="border-white bg-black text-white hover:bg-white hover:text-black mr-4"
+              onClick={() => router.push('/dashboard/investor/MyBids')}
+            >
+              View My Bids
+            </Button>
+
+            {!connected && (
+              <Button
+                variant="outline"
+                className="border-green-500 bg-black text-green-500 hover:bg-green-500 hover:text-black"
+                onClick={handleConnectWallet}
+              >
+                Connect Wallet
+              </Button>
+            )}
+
+            {connected && account && (
+              <Button
+                variant="outline"
+                className="border-red-500 bg-black text-red-500 hover:bg-red-500 hover:text-black"
+                onClick={handleDisconnectWallet}
+              >
+                Disconnect Wallet
+              </Button>
+            )}
+          </div>
+
           <h1 className="text-2xl font-bold">Investor Dashboard</h1>
+
           <Button
             variant="outline"
             className="border-white bg-black text-white hover:bg-white hover:text-black"
@@ -349,6 +418,15 @@ export default function InvestorDashboard() {
             View Personalised Preferences
           </Button>
         </div>
+
+        {connected && account && (
+          <div className="mb-6 p-4 rounded-lg border border-green-500 bg-green-500 bg-opacity-10">
+            <p className="text-green-400">
+              Connected: <span className="font-mono">{String(account.address).substring(0, 6)}...{String(account.address).substring(String(account.address).length - 4)}</span>
+            </p>
+            <p className="text-sm text-gray-400 mt-1">Network: {network?.name || 'Unknown'}</p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
@@ -445,9 +523,15 @@ export default function InvestorDashboard() {
                             <Button
                               className="bg-yellow-500 text-black hover:bg-yellow-600"
                               onClick={() => proceedToPayment(bid)}
+                              disabled={isProcessing || !connected}
                             >
-                              Proceed to Payment
+                              {isProcessing ? "Processing..." : "Proceed to Payment"}
                             </Button>
+                            {!connected && (
+                              <p className="text-sm text-yellow-400 mt-2">
+                                Please connect your wallet to make a payment
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>
