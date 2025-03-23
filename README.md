@@ -1,7 +1,7 @@
 # Investrix
 
 ## Overview
-This is a Next.js web application that leverages AI to match investors with Small and Medium Enterprises (SMEs). The platform features a bidding system for payments built on top of the Aptos blockchain and uses Gemini AI for document verification..
+This is a Next.js web application that leverages AI to match investors with Small and Medium Enterprises (SMEs). The platform features a bidding system for payments built on top of the Aptos blockchain and uses Gemini AI for document verification.
 
 ## Features
 - **AI-powered Matching**: Uses machine learning to connect investors with the most relevant SMEs based on their profiles and investment preferences.
@@ -43,12 +43,3 @@ This is a Next.js web application that leverages AI to match investors with Smal
 4. **Bidding System**: Investors place bids on SMEs they are interested in funding.
 5. **Document Verification**: SMEs upload documents, which are verified using Gemini AI.
 6. **Funding & Transactions**: Approved transactions are recorded on the Aptos blockchain.
-
-## Contributing
-1. Fork the repository.
-2. Create a new branch (`feature-branch`).
-3. Commit your changes.
-4. Push to the branch and create a PR.
-
-## Contact
-For support, contact: `your-email@example.com`
